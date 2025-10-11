@@ -91,15 +91,20 @@ DCF_Calculator/
 
 ## Technical Decisions
 
+### FCFF Calculation Strategy
+- **Start Simple**: Basic FCFF = EBIT - Taxes + D&A - CapEx - ΔWorking Capital
+- **Add Granularity**: Break down each component for advanced analysis as app matures
+- **Historical Focus**: 5-10 years of data for projecting future cash flows
+
 ### Web Framework
 - **Flask** for simplicity and quick iteration
 - Templates for basic UI
 - REST API for data endpoints
 
 ### Data Sources Priority
-1. **Yahoo Finance** - Primary, free, reliable
-2. **Alpha Vantage** - Backup, free tier evaluation
-3. **EDGAR** - SEC filings for fundamental data
+1. **Yahoo Finance** - Primary, free, reliable, historical data
+2. **EDGAR** - SEC filings for detailed fundamental analysis (separate module)
+3. **Alpha Vantage** - Backup, free tier evaluation
 
 ### Excel Export Strategy
 - **openpyxl** for Excel file creation
