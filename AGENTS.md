@@ -8,8 +8,10 @@
 
 - **Run application**: `python main.py`
 - **Install dependencies**: `uv add <package_name>`
+- **Run data modules**: `python data/edgar_api.py` or `python data/yahoofin_api.py`
 - **Run tests**: `pytest` (when configured)
 - **Test single function**: `pytest tests/test_dcf.py::test_calculate_npv -v`
+- **Python version**: 3.13+ (see .python-version)
 
 ## Iterative Development Workflow
 
@@ -33,25 +35,58 @@
 - **DOCUMENT DECISIONS**: Explain DCF assumptions in code comments
 - **FAIL FAST**: Simple validation for financial inputs (no negative cash flows)
 
-### Naming Conventions
+### Code Style Guidelines
 
-- Functions: snake_case (e.g., `calculate_dcf`)
-- Classes: PascalCase (e.g., `DCFCalculator`)
-- Constants: UPPER_SNAKE_CASE (e.g., `DISCOUNT_RATE`)
-- Variables: snake_case (e.g., `cash_flows`)
+- **Functions**: snake_case (e.g., `calculate_dcf`, `get_ebit`)
+- **Classes**: PascalCase (e.g., `DCFCalculator`)
+- **Constants**: UPPER_SNAKE_CASE (e.g., `DISCOUNT_RATE`)
+- **Variables**: snake_case (e.g., `cash_flows`, `ticker`)
+- **Imports**: Group stdlib, third-party, local imports with docstrings at top
+- **Type hints**: Use `typing` module for Optional, Dict, List types
+- **Docstrings**: Use triple quotes with brief function description
 
-### Error Handling
+### Error Handling & Financial Data
 
-- Use specific exception types rather than bare `except:`
-- Include meaningful error messages for financial calculations
-- Consider validation for financial inputs (positive numbers, etc.)
+- Use specific exceptions, not bare `except:`
+- Print meaningful error messages for API failures
+- Return `None` for missing financial data (don't raise)
+- Validate ticker inputs (uppercase conversion)
+- Handle missing financial statement items gracefully
+
+### Dependencies & APIs
+
+- **Core**: pandas, numpy, matplotlib, requests, streamlit
+- **Finance**: yfinance for Yahoo Finance data
+- **SEC EDGAR**: Custom API integration with required User-Agent headers
+- **API Docs**: Always include API documentation links in code comments
 
 ### Testing Strategy
 
-- Unit tests for core DCF calculations
-- Integration tests for full valuation workflow
-- Manual testing: Run with known company data
-- Validation: Compare results with established DCF models
+- Manual testing: Run individual modules with ticker input prompts
+- Unit tests for core DCF calculations (when added)
+- API validation: Test with known tickers (AAPL, MSFT)
+- Financial accuracy verification against established models
+
+### Streamlit Learning Mode (IMPORTANT)
+
+**ROLE**: Streamlit Coach & Learning Facilitator - **DO NOT IMPLEMENT FOR USER**
+
+**Teaching Approach**:
+- 🎯 **Explain concepts** before suggesting implementation
+- 📚 **Provide learning resources** and documentation links  
+- 🤔 **Ask guiding questions** to help user discover solutions
+- 🔍 **Help debug** when user runs into issues
+- ✅ **Review user's code** and suggest improvements
+- 🚫 **Don't write the code** - guide user to write it themselves
+
+**Learning Phases**:
+1. **Streamlit Basics**: Pages, widgets, layout, data display
+2. **DCF Calculator UI**: Input forms, data visualization, interactivity
+3. **Advanced Features**: Caching, session state, error handling
+
+**Commands**:
+- **Run Streamlit**: `streamlit run app.py`
+- **Streamlit docs**: https://docs.streamlit.io/
 
 **Financial Accuracy Priority**: Given real money management, calculation correctness > code elegance
 
