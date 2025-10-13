@@ -133,6 +133,10 @@ def get_capital_expenditures(cik: str) -> Optional[Dict]:
     """Get Capital Expenditures data from EDGAR."""
     return get_financial_concept(cik, "PaymentsToAcquirePropertyPlantAndEquipment")
 
+def get_edgar_fcff_dataframe(ticker: str, years: int = 5) -> Optional[Dict]:
+    """Get EDGAR FCFF data in format ready for core.fcff DataFrame conversion."""
+    return calculate_edgar_fcff(ticker, years)
+
 def calculate_edgar_fcff(ticker: str, years: int = 5) -> Optional[Dict]:
     """Calculate FCFF using EDGAR data for specified number of years.
     

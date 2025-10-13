@@ -149,6 +149,19 @@ def get_historical_fcff_data(ticker):
         print(f"Error fetching historical FCFF data for {ticker}: {e}")
         return None
 
+def get_fcff_dataframe(ticker):
+    """Get historical FCFF data as pandas DataFrame for Streamlit integration.
+    
+    Returns DataFrame with financial components and calculated FCFF, 
+    ready for use with core.fcff functions.
+    """
+    historical_data = get_historical_fcff_data(ticker)
+    if not historical_data:
+        return None
+        
+    # Return dictionary format - core module will handle DataFrame conversion
+    return historical_data
+
 def calculate_fcff(ebit, tax_expense, da, capex, wc_change):
     """Calculate Free Cash Flow to Firm using the basic formula.
     
