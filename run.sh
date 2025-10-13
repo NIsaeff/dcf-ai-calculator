@@ -28,7 +28,7 @@ fi
 
 # Run the Streamlit app
 echo "Launching DCF Calculator interface..."
-echo "Access at: http://localhost:8504"
+echo "Access at: http://localhost:8508"
 echo "Press Ctrl+C to stop"
 
-streamlit run main.py --server.port 8504 --server.headless true
+streamlit run main.py --server.port 8508 --server.headless true

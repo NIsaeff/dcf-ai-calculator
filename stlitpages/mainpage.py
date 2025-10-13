@@ -104,11 +104,12 @@ def display_fcff_analysis(ticker: str, df: pd.DataFrame, data_source: str):
     st.caption(f"Data Source: {data_source}")
     
     # Create tabs for different views
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Financial Data", 
         "FCFF Trends", 
         "Growth Analysis", 
-        "Projections"
+        "WACC Analysis",
+        "DCF Valuation"
     ])
     
     with tab1:
@@ -121,11 +122,16 @@ def display_fcff_analysis(ticker: str, df: pd.DataFrame, data_source: str):
         show_growth_analysis_tab(df)
     
     with tab4:
-        show_projections_tab(df)
+        show_wacc_analysis_tab(ticker, df)
+    
+    with tab5:
+        show_dcf_valuation_tab(ticker, df)
 
 def show_financial_data_tab(df: pd.DataFrame):
     """Show financial data in Excel DCF format (years as columns, line items as rows)."""
     st.subheader("Historical Financial Data")
+    
+    from core.formatting import format_financial_number
     
     # Transpose data to Excel DCF format: line items as rows, years as columns
     dcf_df = df.transpose()
@@ -157,12 +163,36 @@ def show_financial_data_tab(df: pd.DataFrame):
     # Rename index with proper labels
     dcf_display.index = [dcf_labels.get(idx, idx) for idx in dcf_display.index]
     
-    # Format all values as currency
-    dcf_formatted = dcf_display.copy()
+    # Determine appropriate scale for the data
+    max_value = 0
+    for col in dcf_display.columns:
+        col_max = dcf_display[col].abs().max()
+        if pd.notna(col_max):
+            max_value = max(max_value, float(col_max))
+    
+    # Determine scale and format accordingly
+    if max_value >= 1e9:  # Billions
+        scale_factor = 1e9
+        scale_label = "Billions"
+        decimal_places = 2
+    elif max_value >= 1e6:  # Millions  
+        scale_factor = 1e6
+        scale_label = "Millions"
+        decimal_places = 1
+    else:
+        scale_factor = 1e3
+        scale_label = "Thousands"
+        decimal_places = 0
+    
+    # Scale the data and format
+    dcf_scaled = dcf_display / scale_factor
+    dcf_formatted = dcf_scaled.round(decimal_places)
+    
+    # Update column headers to show scale
+    new_columns = {}
     for col in dcf_formatted.columns:
-        dcf_formatted[col] = dcf_formatted[col].apply(
-            lambda x: f"${x:,.0f}" if pd.notna(x) else "N/A"
-        )
+        new_columns[col] = f"{col} ($ {scale_label})"
+    dcf_formatted = dcf_formatted.rename(columns=new_columns)
     
     # Display in Excel-like format
     st.dataframe(dcf_formatted, use_container_width=True)
@@ -182,6 +212,8 @@ def show_financial_data_tab(df: pd.DataFrame):
     # Key metrics summary - ordered by most recent year
     st.subheader("Key Financial Metrics")
     
+    from core.formatting import format_financial_number
+    
     # Get most recent year data
     latest_year = df.index[-1] if len(df) > 0 else "N/A"
     
@@ -189,19 +221,19 @@ def show_financial_data_tab(df: pd.DataFrame):
     
     with col1:
         latest_fcff = df['fcff'].iloc[-1] if len(df) > 0 else 0
-        st.metric(f"FCFF ({latest_year})", f"${latest_fcff:,.0f}")
+        st.metric(f"FCFF ({latest_year})", format_financial_number(latest_fcff))
     
     with col2:
         latest_ebit = df['ebit'].iloc[-1] if len(df) > 0 else 0
-        st.metric(f"EBIT ({latest_year})", f"${latest_ebit:,.0f}")
+        st.metric(f"EBIT ({latest_year})", format_financial_number(latest_ebit))
     
     with col3:
         latest_capex = df['capital_expenditures'].iloc[-1] if len(df) > 0 else 0
-        st.metric(f"CapEx ({latest_year})", f"${latest_capex:,.0f}")
+        st.metric(f"CapEx ({latest_year})", format_financial_number(latest_capex))
     
     with col4:
         avg_fcff = df['fcff'].mean() if len(df) > 0 else 0
-        st.metric("Avg FCFF", f"${avg_fcff:,.0f}")
+        st.metric("Avg FCFF", format_financial_number(avg_fcff))
 
 def show_fcff_trends_tab(ticker: str, df: pd.DataFrame):
     """Show FCFF trends and charts in Excel DCF format."""
@@ -210,9 +242,22 @@ def show_fcff_trends_tab(ticker: str, df: pd.DataFrame):
     # Sort by year for proper time series
     df_sorted = df.sort_index()
     
+    # Determine scale for charts
+    max_fcff = df_sorted['fcff'].abs().max()
+    if max_fcff >= 1e9:
+        chart_scale = 1e9
+        scale_label = "Billions"
+    elif max_fcff >= 1e6:
+        chart_scale = 1e6
+        scale_label = "Millions"
+    else:
+        chart_scale = 1e3
+        scale_label = "Thousands"
+    
     # FCFF trend line chart
-    st.subheader("FCFF Trend Over Time")
-    fcff_chart_data = df_sorted[['fcff']].copy()
+    st.subheader(f"FCFF Trend Over Time ($ {scale_label})")
+    fcff_chart_data = (df_sorted[['fcff']] / chart_scale).copy()
+    fcff_chart_data.columns = [f'FCFF ($ {scale_label})']
     fcff_chart_data.index = fcff_chart_data.index.astype(str)
     st.line_chart(fcff_chart_data, height=400)
     
@@ -226,15 +271,15 @@ def show_fcff_trends_tab(ticker: str, df: pd.DataFrame):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**Operating Performance**")
-        operating_data = df_sorted[['ebit', 'tax_expense']].copy()
+        st.write(f"**Operating Performance ($ {scale_label})**")
+        operating_data = (df_sorted[['ebit', 'tax_expense']] / chart_scale).copy()
         operating_data.columns = ['EBIT', 'Tax Expense']
         operating_data.index = operating_data.index.astype(str)
         st.bar_chart(operating_data, height=300)
     
     with col2:
-        st.write("**Cash Flow Adjustments**")
-        adjustments_data = df_sorted[['depreciation_amortization', 'capital_expenditures']].copy()
+        st.write(f"**Cash Flow Adjustments ($ {scale_label})**")
+        adjustments_data = (df_sorted[['depreciation_amortization', 'capital_expenditures']] / chart_scale).copy()
         adjustments_data.columns = ['D&A (Add)', 'CapEx (Subtract)']
         # Make CapEx negative for visual clarity
         adjustments_data['CapEx (Subtract)'] = -adjustments_data['CapEx (Subtract)']
@@ -390,6 +435,245 @@ def show_projections_tab(df: pd.DataFrame):
         
     except Exception as e:
         st.error(f"Error generating projections: {e}")
+
+def show_wacc_analysis_tab(ticker: str, df: pd.DataFrame):
+    """Show WACC calculation and analysis."""
+    st.subheader(f"{ticker} WACC Analysis")
+    
+    try:
+        from core.wacc import calculate_wacc, wacc_sensitivity_analysis
+        
+        # Calculate WACC
+        with st.spinner("Calculating WACC..."):
+            wacc_data = calculate_wacc(ticker)
+        
+        # Display WACC results
+        col1, col2 = st.columns(2)
+        
+        from core.formatting import format_percentage, format_financial_number
+        
+        with col1:
+            st.subheader("WACC Components")
+            st.metric("WACC", format_percentage(wacc_data['wacc']))
+            st.metric("Cost of Equity", format_percentage(wacc_data['cost_of_equity']))
+            st.metric("Cost of Debt", format_percentage(wacc_data['cost_of_debt']))
+            st.metric("Beta", f"{wacc_data['beta']:.2f}")
+        
+        with col2:
+            st.subheader("Capital Structure")
+            st.metric("Equity Weight", format_percentage(wacc_data['weight_equity']))
+            st.metric("Debt Weight", format_percentage(wacc_data['weight_debt']))
+            st.metric("Risk-free Rate", format_percentage(wacc_data['risk_free_rate']))
+            st.metric("Market Risk Premium", format_percentage(wacc_data['market_risk_premium']))
+            st.metric("Market Cap", format_financial_number(wacc_data['market_cap']))
+            st.metric("Total Debt", format_financial_number(wacc_data['total_debt']))
+        
+        # WACC breakdown chart
+        st.subheader("WACC Composition")
+        wacc_components = pd.DataFrame({
+            'Component': ['Cost of Equity', 'Cost of Debt'],
+            'Weight': [wacc_data['weight_equity'], wacc_data['weight_debt']],
+            'Rate': [wacc_data['cost_of_equity'], wacc_data['cost_of_debt']],
+            'Contribution': [
+                wacc_data['weight_equity'] * wacc_data['cost_of_equity'],
+                wacc_data['weight_debt'] * wacc_data['cost_of_debt']
+            ]
+        })
+        
+        # Format percentages for table display (not abbreviated)
+        for col in ['Weight', 'Rate', 'Contribution']:
+            wacc_components[col] = wacc_components[col].apply(lambda x: f"{x:.2%}")
+        
+        st.dataframe(wacc_components, use_container_width=True, hide_index=True)
+        
+        # Sensitivity analysis
+        st.subheader("WACC Sensitivity Analysis")
+        sensitivity_df = wacc_sensitivity_analysis(ticker, wacc_data)
+        
+        # Group by parameter for better display
+        for param in sensitivity_df['Parameter'].unique():
+            param_data = sensitivity_df[sensitivity_df['Parameter'] == param]
+            st.write(f"**{param.replace('_', ' ').title()}:**")
+            
+            cols = st.columns(3)
+            for i, (_, row) in enumerate(param_data.iterrows()):
+                with cols[i]:
+                    change_str = f"({row['Change_from_Base']:+.2%})" if row['Change_from_Base'] != 0 else ""
+                    st.metric(
+                        row['Scenario'], 
+                        f"{row['WACC']:.2%}",
+                        delta=change_str
+                    )
+        
+    except Exception as e:
+        st.error(f"Error calculating WACC: {e}")
+
+def show_dcf_valuation_tab(ticker: str, df: pd.DataFrame):
+    """Show complete DCF valuation with terminal value."""
+    st.subheader(f"{ticker} DCF Valuation")
+    
+    try:
+        from core.wacc import calculate_wacc
+        from core.growth_rates import forecast_multi_stage_growth
+        from core.dcf_valuation import perform_dcf_valuation, dcf_sensitivity_analysis
+        from core.fcff import project_future_fcff
+        
+        # Get WACC
+        wacc_data = calculate_wacc(ticker)
+        
+        # User inputs for DCF
+        st.subheader("DCF Assumptions")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            projection_years = st.slider("Projection Years", 3, 10, 5)
+            terminal_growth = st.number_input(
+                "Terminal Growth Rate (%)",
+                min_value=0.0,
+                max_value=5.0,
+                value=2.5,
+                step=0.1,
+                format="%.1f"
+            ) / 100
+        
+        with col2:
+            custom_wacc = st.number_input(
+                "Custom WACC (%)", 
+                min_value=5.0,
+                max_value=20.0,
+                value=wacc_data['wacc'] * 100,
+                step=0.1,
+                format="%.1f"
+            ) / 100
+            
+            shares_outstanding = st.number_input(
+                "Shares Outstanding (millions)",
+                min_value=1.0,
+                value=1000.0,
+                step=1.0,
+                format="%.0f"
+            ) * 1_000_000
+        
+        with col3:
+            industry_sector = st.selectbox(
+                "Industry Sector",
+                ['Technology', 'Healthcare', 'Consumer Discretionary', 
+                 'Financials', 'Consumer Staples', 'Utilities', 
+                 'Energy', 'Materials', 'Industrials', 
+                 'Communication Services', 'Real Estate']
+            )
+        
+        # Calculate projections with advanced growth model
+        fcff_series = pd.Series(df['fcff'].values, index=df.index)
+        
+        # Use multi-stage growth forecast
+        growth_forecast = forecast_multi_stage_growth(
+            historical_fcff=fcff_series,
+            industry_sector=industry_sector,
+            high_growth_years=min(projection_years, 5),
+            transition_years=max(0, projection_years - 5)
+        )
+        
+        # Create projected FCFF using growth rates
+        latest_year = max(fcff_series.index)
+        latest_fcff = fcff_series[latest_year]
+        
+        projected_data = []
+        current_fcff = latest_fcff
+        
+        for i, growth_rate in enumerate(growth_forecast['growth_rates']):
+            year = int(latest_year) + i + 1
+            current_fcff = current_fcff * (1 + growth_rate)
+            projected_data.append({
+                'year': str(year),
+                'projected_fcff': current_fcff,
+                'growth_rate': growth_rate
+            })
+        
+        projections_df = pd.DataFrame(projected_data)
+        projections_df = projections_df.set_index('year')
+        
+        # Update WACC in wacc_data
+        wacc_data['wacc'] = custom_wacc
+        
+        # Perform DCF valuation
+        valuation_results = perform_dcf_valuation(
+            projected_fcff=projections_df,
+            wacc_data=wacc_data,
+            terminal_growth_rate=terminal_growth,
+            shares_outstanding=shares_outstanding
+        )
+        
+        from core.formatting import format_financial_number, format_percentage
+        
+        # Display valuation results
+        st.subheader("Valuation Results")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Enterprise Value", format_financial_number(valuation_results['enterprise_value']))
+        
+        with col2:
+            st.metric("Equity Value", format_financial_number(valuation_results['equity_value']))
+        
+        with col3:
+            st.metric("Value per Share", format_financial_number(valuation_results['value_per_share']))
+        
+        with col4:
+            st.metric("Terminal Value %", format_percentage(valuation_results['terminal_value_percentage']))
+        
+        # DCF breakdown
+        st.subheader("DCF Value Breakdown")
+        
+        breakdown_data = pd.DataFrame({
+            'Component': ['Operating Cash Flows (PV)', 'Terminal Value (PV)', 'Enterprise Value', 'Less: Net Debt', 'Equity Value'],
+            'Value': [
+                valuation_results['pv_operating_cash_flows'],
+                valuation_results['pv_terminal_value'],
+                valuation_results['enterprise_value'],
+                -valuation_results['net_debt'],
+                valuation_results['equity_value']
+            ]
+        })
+        
+        # Determine scale for breakdown table
+        max_breakdown_value = max([abs(x) for x in breakdown_data['Value']])
+        if max_breakdown_value >= 1e9:
+            breakdown_scale = 1e9
+            breakdown_scale_label = "Billions"
+        elif max_breakdown_value >= 1e6:
+            breakdown_scale = 1e6
+            breakdown_scale_label = "Millions"
+        else:
+            breakdown_scale = 1e3
+            breakdown_scale_label = "Thousands"
+        
+        # Scale the breakdown values
+        breakdown_data['Value ($ ' + breakdown_scale_label + ')'] = (breakdown_data['Value'] / breakdown_scale).round(2)
+        breakdown_display = breakdown_data[['Component', 'Value ($ ' + breakdown_scale_label + ')']].copy()
+        
+        st.dataframe(breakdown_display, use_container_width=True, hide_index=True)
+        
+        # Sensitivity analysis
+        st.subheader("DCF Sensitivity Analysis")
+        st.write("Value per Share sensitivity to WACC and Terminal Growth Rate")
+        
+        sensitivity_matrix = dcf_sensitivity_analysis(
+            projected_fcff=projections_df,
+            wacc_base=custom_wacc,
+            terminal_growth_base=terminal_growth,
+            shares_outstanding=shares_outstanding,
+            wacc_range=(custom_wacc * 0.8, custom_wacc * 1.2),
+            growth_range=(terminal_growth * 0.5, terminal_growth * 1.5),
+            steps=5
+        )
+        
+        st.dataframe(sensitivity_matrix, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"Error performing DCF valuation: {e}")
 
 def show_sample_data():
     """Show sample data when no analysis has been run."""
