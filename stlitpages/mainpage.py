@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, Dict
 
 def show_main_page():
     """Display the main FCFF calculation interface."""
@@ -220,19 +220,19 @@ def show_financial_data_tab(df: pd.DataFrame):
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        latest_fcff = df['fcff'].iloc[-1] if len(df) > 0 else 0
+        latest_fcff = float(df['fcff'].iloc[-1]) if len(df) > 0 else 0.0
         st.metric(f"FCFF ({latest_year})", format_financial_number(latest_fcff))
     
     with col2:
-        latest_ebit = df['ebit'].iloc[-1] if len(df) > 0 else 0
+        latest_ebit = float(df['ebit'].iloc[-1]) if len(df) > 0 else 0.0
         st.metric(f"EBIT ({latest_year})", format_financial_number(latest_ebit))
     
     with col3:
-        latest_capex = df['capital_expenditures'].iloc[-1] if len(df) > 0 else 0
+        latest_capex = float(df['capital_expenditures'].iloc[-1]) if len(df) > 0 else 0.0
         st.metric(f"CapEx ({latest_year})", format_financial_number(latest_capex))
     
     with col4:
-        avg_fcff = df['fcff'].mean() if len(df) > 0 else 0
+        avg_fcff = float(df['fcff'].mean()) if len(df) > 0 else 0.0
         st.metric("Avg FCFF", format_financial_number(avg_fcff))
 
 def show_fcff_trends_tab(ticker: str, df: pd.DataFrame):
@@ -500,7 +500,7 @@ def show_wacc_analysis_tab(ticker: str, df: pd.DataFrame):
                 with cols[i]:
                     change_str = f"({row['Change_from_Base']:+.2%})" if row['Change_from_Base'] != 0 else ""
                     st.metric(
-                        row['Scenario'], 
+                        str(row['Scenario']), 
                         f"{row['WACC']:.2%}",
                         delta=change_str
                     )
@@ -508,18 +508,45 @@ def show_wacc_analysis_tab(ticker: str, df: pd.DataFrame):
     except Exception as e:
         st.error(f"Error calculating WACC: {e}")
 
+@st.cache_data(ttl=3600, show_spinner="Calculating WACC...")
+def get_cached_wacc(ticker: str):
+    """Get WACC data with caching to prevent repeated API calls."""
+    try:
+        from core.wacc import calculate_wacc
+        return calculate_wacc(ticker)
+    except Exception as e:
+        st.warning(f"Could not calculate WACC: {e}. Using default values.")
+        return None
+
 def show_dcf_valuation_tab(ticker: str, df: pd.DataFrame):
     """Show complete DCF valuation with terminal value."""
     st.subheader(f"{ticker} DCF Valuation")
     
     try:
-        from core.wacc import calculate_wacc
         from core.growth_rates import forecast_multi_stage_growth
         from core.dcf_valuation import perform_dcf_valuation, dcf_sensitivity_analysis
         from core.fcff import project_future_fcff
         
-        # Get WACC
-        wacc_data = calculate_wacc(ticker)
+        # Get WACC with caching
+        wacc_data = get_cached_wacc(ticker)
+        
+        # Use default WACC if calculation failed
+        if wacc_data is None:
+            wacc_data = {
+                'wacc': 0.10,
+                'cost_of_equity': 0.12,
+                'cost_of_debt': 0.05,
+                'weight_equity': 0.8,
+                'weight_debt': 0.2,
+                'market_cap': 1_000_000_000,
+                'total_debt': 100_000_000,
+                'cash': 50_000_000,
+                'tax_rate': 0.21,
+                'beta': 1.0,
+                'risk_free_rate': 0.045,
+                'market_risk_premium': 0.06
+            }
+            st.info("Using default WACC assumptions. Adjust 'Custom WACC' below as needed.")
         
         # User inputs for DCF
         st.subheader("DCF Assumptions")
@@ -527,24 +554,32 @@ def show_dcf_valuation_tab(ticker: str, df: pd.DataFrame):
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            projection_years = st.slider("Projection Years", 3, 10, 5)
+            projection_years = st.slider(
+                "Projection Years", 
+                min_value=3, 
+                max_value=10, 
+                value=5,
+                key="dcf_projection_years"
+            )
             terminal_growth = st.number_input(
                 "Terminal Growth Rate (%)",
                 min_value=0.0,
                 max_value=5.0,
                 value=2.5,
                 step=0.1,
-                format="%.1f"
+                format="%.1f",
+                key="dcf_terminal_growth"
             ) / 100
         
         with col2:
             custom_wacc = st.number_input(
                 "Custom WACC (%)", 
-                min_value=5.0,
-                max_value=20.0,
-                value=wacc_data['wacc'] * 100,
+                min_value=1.0,
+                max_value=30.0,
+                value=float(wacc_data['wacc'] * 100),
                 step=0.1,
-                format="%.1f"
+                format="%.1f",
+                key="dcf_custom_wacc"
             ) / 100
             
             shares_outstanding = st.number_input(
@@ -552,7 +587,8 @@ def show_dcf_valuation_tab(ticker: str, df: pd.DataFrame):
                 min_value=1.0,
                 value=1000.0,
                 step=1.0,
-                format="%.0f"
+                format="%.0f",
+                key="dcf_shares_outstanding"
             ) * 1_000_000
         
         with col3:
@@ -561,8 +597,14 @@ def show_dcf_valuation_tab(ticker: str, df: pd.DataFrame):
                 ['Technology', 'Healthcare', 'Consumer Discretionary', 
                  'Financials', 'Consumer Staples', 'Utilities', 
                  'Energy', 'Materials', 'Industrials', 
-                 'Communication Services', 'Real Estate']
+                 'Communication Services', 'Real Estate'],
+                key="dcf_industry_sector"
             )
+        
+        # Validate WACC > terminal_growth_rate
+        if custom_wacc <= terminal_growth:
+            st.error(f"⚠️ WACC ({custom_wacc:.1%}) must be greater than Terminal Growth Rate ({terminal_growth:.1%}) to avoid division errors!")
+            st.stop()
         
         # Calculate projections with advanced growth model
         fcff_series = pd.Series(df['fcff'].values, index=df.index)
