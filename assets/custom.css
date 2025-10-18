@@ -1,0 +1,42 @@
+/* Custom CSS for DCF Calculator Dash App */
+
+/* Tab styling */
+.custom-tab {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Metric cards */
+.metric-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+/* Chart containers */
+.chart-container {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* Sidebar styling */
+.bg-light {
+    background-color: #f8f9fa !important;
+    border-right: 1px solid #dee2e6;
+}
+
+/* Alert improvements */
+.alert {
+    border-radius: 8px;
+}
+
+/* Button hover effects */
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transition: all 0.2s;
+}
