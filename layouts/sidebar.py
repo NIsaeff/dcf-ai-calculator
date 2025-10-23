@@ -41,6 +41,7 @@ def create_sidebar():
             id="historical-years",
             min=3,
             max=10,
+            step=1,
             value=5,
             marks={i: str(i) for i in range(3, 11)},
             tooltip={"placement": "bottom", "always_visible": True},

@@ -40,6 +40,11 @@ app.layout = dbc.Container([
     dcc.Store(id='wacc-data-store'),
     dcc.Store(id='ticker-store'),
     
+    # Hidden DCF assumption stores (updated from DCF tab controls)
+    dcc.Store(id='projection-years', data=5),
+    dcc.Store(id='terminal-growth-rate', data=2.5),
+    dcc.Store(id='wacc-override', data=None),
+    
 ], fluid=True, className="px-4")
 
 # Register all callbacks
