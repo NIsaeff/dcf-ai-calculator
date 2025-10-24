@@ -36,9 +36,7 @@ def create_main_content():
                     id="main-tabs",
                     value="fcff-tab",
                     children=[
-                        dcc.Tab(label="Financial Data", value="fcff-tab", className="custom-tab"),
-                        dcc.Tab(label="FCFF Trends", value="trends-tab", className="custom-tab"),
-                        dcc.Tab(label="Growth Analysis", value="growth-tab", className="custom-tab"),
+                        dcc.Tab(label="FCFF Analysis", value="fcff-tab", className="custom-tab"),
                         dcc.Tab(label="WACC Analysis", value="wacc-tab", className="custom-tab"),
                         dcc.Tab(label="DCF Valuation", value="dcf-tab", className="custom-tab")
                     ]

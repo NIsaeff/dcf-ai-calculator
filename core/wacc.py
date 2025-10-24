@@ -3,7 +3,7 @@
 import pandas as pd
 import numpy as np
 import requests
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 import yfinance as yf
 
 def get_risk_free_rate() -> float:
@@ -346,6 +346,139 @@ def wacc_sensitivity_analysis(ticker: str,
             })
     
     return pd.DataFrame(results)
+
+
+def calculate_wacc_enhanced(ticker: str,
+                          cost_of_equity_method: str = 'direct',
+                          direct_cost_of_equity: float = 0.12,
+                          tax_rate: float = 0.21,
+                          capm_overrides: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+    """Calculate WACC with enhanced options - direct input default, CAPM optional.
+    
+    Args:
+        ticker: Stock ticker symbol
+        cost_of_equity_method: 'direct' or 'capm'
+        direct_cost_of_equity: Direct cost of equity input (default 12%)
+        tax_rate: Corporate tax rate (default 21%)
+        capm_overrides: Optional overrides for CAPM components
+        
+    Returns:
+        Enhanced dictionary with WACC components, method used, and comparison data
+    """
+    # Get financial data (always needed for capital structure)
+    financial_data = get_financial_data_for_wacc(ticker)
+    
+    # Calculate cost of debt (always needed)
+    cost_of_debt = calculate_cost_of_debt(
+        ticker,
+        financial_data['total_debt'],
+        financial_data['interest_expense'],
+        tax_rate
+    )
+    
+    # Calculate capital structure weights
+    market_value_equity = financial_data['market_cap']
+    market_value_debt = financial_data['total_debt']
+    total_value = market_value_equity + market_value_debt
+    
+    if total_value <= 0:
+        weight_equity = 1.0
+        weight_debt = 0.0
+    else:
+        weight_equity = market_value_equity / total_value
+        weight_debt = market_value_debt / total_value
+    
+    # Determine cost of equity based on method
+    if cost_of_equity_method == 'direct':
+        cost_of_equity = direct_cost_of_equity
+        equity_method_data = {
+            'method': 'direct',
+            'cost_of_equity': cost_of_equity,
+            'rationale': f"Direct input: {cost_of_equity:.1%}"
+        }
+    else:  # capm
+        equity_data = calculate_cost_of_equity(ticker)
+        if capm_overrides:
+            # Apply CAPM overrides
+            for key, value in capm_overrides.items():
+                if key in equity_data:
+                    equity_data[key] = value
+            # Recalculate cost of equity with overrides
+            cost_of_equity = (equity_data['risk_free_rate'] + 
+                            equity_data['beta'] * equity_data['market_risk_premium'])
+            equity_data['cost_of_equity'] = cost_of_equity
+        else:
+            cost_of_equity = equity_data['cost_of_equity']
+        
+        equity_method_data = {
+            'method': 'capm',
+            'cost_of_equity': cost_of_equity,
+            'risk_free_rate': equity_data['risk_free_rate'],
+            'beta': equity_data['beta'],
+            'market_risk_premium': equity_data['market_risk_premium'],
+            'rationale': f"CAPM: {equity_data['risk_free_rate']:.1%} + {equity_data['beta']:.2f} × {equity_data['market_risk_premium']:.1%}"
+        }
+    
+    # Calculate WACC
+    wacc = (weight_equity * cost_of_equity) + (weight_debt * cost_of_debt)
+    
+    # Calculate alternative method for comparison (if not already calculated)
+    alternative_data = None
+    if cost_of_equity_method == 'direct':
+        # Calculate CAPM for comparison
+        try:
+            capm_data = calculate_cost_of_equity(ticker)
+            alternative_cost_of_equity = capm_data['cost_of_equity']
+            alternative_wacc = (weight_equity * alternative_cost_of_equity) + (weight_debt * cost_of_debt)
+            alternative_data = {
+                'method': 'capm',
+                'cost_of_equity': alternative_cost_of_equity,
+                'wacc': alternative_wacc,
+                'difference_vs_primary': alternative_cost_of_equity - cost_of_equity,
+                'wacc_difference': alternative_wacc - wacc
+            }
+        except:
+            alternative_data = None
+    else:
+        # Show direct input comparison
+        alternative_cost_of_equity = direct_cost_of_equity
+        alternative_wacc = (weight_equity * alternative_cost_of_equity) + (weight_debt * cost_of_debt)
+        alternative_data = {
+            'method': 'direct',
+            'cost_of_equity': alternative_cost_of_equity,
+            'wacc': alternative_wacc,
+            'difference_vs_primary': alternative_cost_of_equity - cost_of_equity,
+            'wacc_difference': alternative_wacc - wacc
+        }
+    
+    return {
+        # Primary calculation results
+        'wacc': wacc,
+        'cost_of_equity': cost_of_equity,
+        'cost_of_debt': cost_of_debt,
+        'weight_equity': weight_equity,
+        'weight_debt': weight_debt,
+        'tax_rate': tax_rate,
+        
+        # Financial data
+        'market_cap': market_value_equity,
+        'total_debt': market_value_debt,
+        'total_value': total_value,
+        'interest_expense': financial_data['interest_expense'],
+        
+        # Method information
+        'primary_method': equity_method_data,
+        'alternative_method': alternative_data,
+        
+        # Component breakdown for display
+        'equity_component': weight_equity * cost_of_equity,
+        'debt_component': weight_debt * cost_of_debt,
+        
+        # Meta information
+        'calculation_method': cost_of_equity_method,
+        'ticker': ticker
+    }
+
 
 if __name__ == "__main__":
     # Test WACC calculations
