@@ -6,6 +6,7 @@ import dash_bootstrap_components as dbc
 from layouts.sidebar import create_sidebar
 from layouts.main_content import create_main_content
 from callbacks import register_callbacks
+import os
 
 
 # Initialize Dash app with Bootstrap theme
