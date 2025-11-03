@@ -3,9 +3,9 @@
 import dash
 from dash import dcc, html
 import dash_bootstrap_components as dbc
-from layouts.sidebar import create_sidebar
-from layouts.main_content import create_main_content
-from callbacks import register_callbacks
+from dcf_calculator.layouts.sidebar import create_sidebar
+from dcf_calculator.layouts.main_content import create_main_content
+from dcf_calculator.callbacks import register_callbacks
 import os
 
 

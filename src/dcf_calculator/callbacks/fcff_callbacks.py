@@ -3,10 +3,10 @@
 from dash import Input, Output, State, html, dcc
 import dash_bootstrap_components as dbc
 import pandas as pd
-from core.fcff import convert_api_data_to_dataframe
-from core.formatting import format_financial_number
-from data.yahoofin_api import get_fcff_dataframe
-from data.edgar_api import get_edgar_fcff_dataframe
+from dcf_calculator.core.fcff import convert_api_data_to_dataframe
+from dcf_calculator.core.formatting import format_financial_number
+from dcf_calculator.data.yahoofin_api import get_fcff_dataframe
+from dcf_calculator.data.edgar_api import get_edgar_fcff_dataframe
 import logging
 
 logger = logging.getLogger(__name__)

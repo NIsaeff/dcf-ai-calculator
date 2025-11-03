@@ -8,10 +8,10 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 import plotly.express as px
-from core.wacc import calculate_wacc
-from core.dcf_valuation import perform_dcf_valuation
-from core.growth_rates import calculate_revenue_growth_rate
-from core.formatting import format_financial_number, format_percentage
+from dcf_calculator.core.wacc import calculate_wacc
+from dcf_calculator.core.dcf_valuation import perform_dcf_valuation
+from dcf_calculator.core.growth_rates import calculate_revenue_growth_rate
+from dcf_calculator.core.formatting import format_financial_number, format_percentage
 import logging
 
 logger = logging.getLogger(__name__)
